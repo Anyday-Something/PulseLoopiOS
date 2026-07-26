@@ -9,6 +9,10 @@ struct RootAppView: View {
     @Query private var profiles: [UserProfile]
     @State private var path = NavigationPath()
     @State private var didFinishForcedOnboarding = false
+    /// Launch-arg handling must run at most once per process: `.task` re-fires when the
+    /// root Group swaps content (onboarding → main tabs), and a second reseed would wipe
+    /// the sessions that routes already in `path` point at, stranding stale detail pages.
+    @State private var didRunLaunchArgs = false
 
     private var forceOnboardingForTesting: Bool {
         #if DEBUG
@@ -37,17 +41,23 @@ struct RootAppView: View {
             // Demo data is opt-in: load it from Settings → "Reseed demo data", or via the
             // `-seedDemo YES` launch arg (test tooling only). Normal launches start empty.
             .task {
-                if UserDefaults.standard.bool(forKey: "seedDemo") {
-                    SeedData.clearAll(modelContext)
-                    SeedData.seedDemo(modelContext, completeOnboarding: true)
-                }
-                // Test tooling: deep-link straight to a seeded workout's detail (route map).
-                if UserDefaults.standard.bool(forKey: "openWorkout"),
-                   let session = ActivityRepository.sessions(context: modelContext).first(where: { $0.status == .finished && $0.useGps }) {
-                    path.append(AppRoute.activityDetail(session.id))
-                }
-                if UserDefaults.standard.bool(forKey: "openRecord") {
-                    path.append(AppRoute.recordSelect)
+                if !didRunLaunchArgs {
+                    didRunLaunchArgs = true
+                    if UserDefaults.standard.bool(forKey: "seedDemo") {
+                        SeedData.clearAll(modelContext)
+                        SeedData.seedDemo(modelContext, completeOnboarding: true)
+                    }
+                    // Test tooling: deep-link straight to a seeded workout's detail (route map).
+                    if UserDefaults.standard.bool(forKey: "openWorkout"),
+                       let session = ActivityRepository.sessions(context: modelContext).first(where: { $0.status == .finished && $0.useGps }) {
+                        // Start from a clean stack so Back always lands on the dashboard —
+                        // never on a stale detail route left over from an earlier push.
+                        path = NavigationPath()
+                        path.append(AppRoute.activityDetail(session.id))
+                    }
+                    if UserDefaults.standard.bool(forKey: "openRecord") {
+                        path.append(AppRoute.recordSelect)
+                    }
                 }
                 // Re-attach to an in-progress workout left running across launches.
                 liveWorkout.recover()
