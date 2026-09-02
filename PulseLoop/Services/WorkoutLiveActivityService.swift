@@ -12,7 +12,7 @@ import Combine
 import ActivityKit
 import os.log
 
-private let liveActivityLog = Logger(subsystem: "xyz.sakshambhutani.pulseloop2", category: "LiveActivity")
+private let liveActivityLog = Logger(subsystem: "com.anydaysomething.pulseloop", category: "LiveActivity")
 
 struct WorkoutLiveActivityDisplayOptions {
     let usesGps: Bool

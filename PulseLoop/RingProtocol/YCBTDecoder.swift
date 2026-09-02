@@ -1,7 +1,7 @@
 import Foundation
 import os.log
 
-private let ycbtLog = Logger(subsystem: "xyz.sakshambhutani.pulseloop2", category: "YCBTDecoder")
+private let ycbtLog = Logger(subsystem: "com.anydaysomething.pulseloop", category: "YCBTDecoder")
 
 /// Decodes inbound YCBT frames into the shared `RingDecodedEvent`. Frames arrive already reassembled
 /// (`YCBTFrameAssembler`) and CRC-validated (`YCBTFrame`), from either the command channel (be940001)

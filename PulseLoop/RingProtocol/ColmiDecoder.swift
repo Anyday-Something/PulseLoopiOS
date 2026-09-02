@@ -2,7 +2,7 @@ import Foundation
 import os.log
 
 #if DEBUG
-private let realtimeHRLog = Logger(subsystem: "xyz.sakshambhutani.pulseloop2", category: "ColmiRealtimeHR")
+private let realtimeHRLog = Logger(subsystem: "com.anydaysomething.pulseloop", category: "ColmiRealtimeHR")
 #endif
 
 /// Decodes Colmi frames into the shared `RingDecodedEvent`. Two channels:

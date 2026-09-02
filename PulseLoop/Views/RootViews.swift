@@ -64,7 +64,7 @@ struct RootAppView: View {
                 // Test tooling: headless full-archive export/import against
                 // Documents/pulseloop-export.json, so the simulator smoke test can drive the
                 // feature without the share sheet / file picker.
-                let archiveLog = Logger(subsystem: "xyz.sakshambhutani.pulseloop2", category: "DataArchive")
+                let archiveLog = Logger(subsystem: "com.anydaysomething.pulseloop", category: "DataArchive")
                 if UserDefaults.standard.bool(forKey: "exportDataToDocuments"),
                    let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
                     let url = docs.appendingPathComponent("pulseloop-export.json")

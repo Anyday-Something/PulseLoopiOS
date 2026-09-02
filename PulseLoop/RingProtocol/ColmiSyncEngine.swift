@@ -1,7 +1,7 @@
 import Foundation
 import os.log
 
-private let syncLog = Logger(subsystem: "xyz.sakshambhutani.pulseloop2", category: "ColmiSyncEngine")
+private let syncLog = Logger(subsystem: "com.anydaysomething.pulseloop", category: "ColmiSyncEngine")
 
 /// Colmi R02 sync engine: the response-driven history state machine + realtime-HR keepalive +
 /// measurement actions. Unlike the fire-and-forget jring, Colmi history is a chain where each reply
