@@ -33,9 +33,32 @@ final class LuckRingSyncEngine: RingSyncEngine {
     /// peripheral id, and one bind flag is the conservative behaviour for the common single-ring case.)
     private static let pairFinishedKey = "luckring.pairFinished"
 
-    init(writer: RingCommandWriter?, historySync: LuckRingHistorySync) {
+    /// How long the wire is left to the ring after the bind bundle before the startup REQUESTs go out.
+    ///
+    /// The ring answers the MixInfo bundle by streaming its stored history unsolicited, as multi-page
+    /// frames. A REQUEST sent into that stream is answered with an ACK head that lands between the
+    /// pages of whatever frame is in flight; the assembler survives that now, but the ring itself has
+    /// been seen to stall a push when it has to interleave replies. Observed on a TK18: three nights of
+    /// sleep arrived intact once the requests were held back, and not at all when they were not.
+    private let startupSettleSeconds: TimeInterval
+    private var startupTask: Task<Void, Never>?
+
+    init(writer: RingCommandWriter?, historySync: LuckRingHistorySync, startupSettleSeconds: TimeInterval = 2.5) {
         self.writer = writer
         self.historySync = historySync
+        self.startupSettleSeconds = startupSettleSeconds
+    }
+
+    // MARK: Link lifecycle
+
+    /// A new link (auto-reconnect reuses the engine) or a dropped one must not fire the previous
+    /// startup's deferred requests into it.
+    func connectionDidStart() { cancelDeferredStartup() }
+    func connectionDidEnd() { cancelDeferredStartup() }
+
+    private func cancelDeferredStartup() {
+        startupTask?.cancel()
+        startupTask = nil
     }
 
     /// Split a logical frame into 20-byte packets and enqueue each (the driver's `frame(_:)` is identity).
@@ -54,11 +77,17 @@ final class LuckRingSyncEngine: RingSyncEngine {
 
         send(encoder.autoMonitoring(measurementSettings))
 
-        send(encoder.request(LuckRingDataType.devInfo))
-        send(encoder.request(LuckRingDataType.battery))
-        send(encoder.request(LuckRingDataType.devSync))
-
-        historySync.start(types: LuckRingHistorySync.catalog)
+        // Leave the wire to the ring's post-bind history push, then ask for the rest.
+        cancelDeferredStartup()
+        startupTask = Task { [weak self] in
+            let nanos = UInt64((self?.startupSettleSeconds ?? 2.5) * 1_000_000_000)
+            try? await Task.sleep(nanoseconds: nanos)
+            guard !Task.isCancelled, let self else { return }
+            self.send(self.encoder.request(LuckRingDataType.devInfo))
+            self.send(self.encoder.request(LuckRingDataType.battery))
+            self.send(self.encoder.request(LuckRingDataType.devSync))
+            self.historySync.start(types: LuckRingHistorySync.catalog)
+        }
     }
 
     /// History is pager-driven — nothing here advances it.
