@@ -32,6 +32,19 @@
 	</dict>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>PulseLoop connects to the AI model server you run on your own network, so coaching can happen without sending your health data to a cloud provider.</string>
+	<key>UIApplicationShortcutItems</key>
+	<array>
+		<dict>
+			<key>UIApplicationShortcutItemType</key>
+			<string>com.pulseloop.sync</string>
+			<key>UIApplicationShortcutItemTitle</key>
+			<string>Sync ring</string>
+			<key>UIApplicationShortcutItemSubtitle</key>
+			<string>Pull new data from the ring now</string>
+			<key>UIApplicationShortcutItemIconSymbolName</key>
+			<string>arrow.triangle.2.circlepath</string>
+		</dict>
+	</array>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>location</string>

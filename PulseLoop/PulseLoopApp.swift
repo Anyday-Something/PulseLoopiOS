@@ -11,7 +11,9 @@ import UserNotifications
 
 @main
 struct PulseLoopApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @Environment(\.scenePhase) private var scenePhase
+    @State private var quickActions = QuickActionRouter.shared
     let container: ModelContainer
     @State private var bleClient: RingBLEClient
     @State private var coordinator: RingSyncCoordinator
@@ -148,6 +150,10 @@ struct PulseLoopApp: App {
                 .environment(liveWorkout)
         }
         .modelContainer(container)
+        .onChange(of: quickActions.pending) { _, action in
+            guard action != nil, scenePhase == .active, quickActions.consume() == .sync else { return }
+            coordinator.handleQuickSync()
+        }
         .onChange(of: scenePhase) { _, phase in
             // Flush any batched-but-unsaved ring writes before the app suspends so a mid-sync
             // batch isn't lost.
@@ -170,6 +176,15 @@ struct PulseLoopApp: App {
             // last-known ring if it isn't actually connected. (Android foreground-reconnect parity.)
             if bleClient.hasLastKnownRing, bleClient.state != .connected {
                 bleClient.connectLastKnown()
+            }
+            // A cold start from the "Sync ring" quick action lands here before any view observed the
+            // router; a warm-app tap is caught by `onChange` below. Either way the action runs once.
+            if quickActions.consume() == .sync {
+                coordinator.handleQuickSync()
+            } else {
+                // Opening the app is enough to get fresh data: re-sync a connected ring that has not
+                // synced in the last couple of minutes.
+                coordinator.syncOnForeground()
             }
             // Both calls are no-ops when the AI Coach master switch is off — the
             // scheduler gates on `coachMasterEnabled`, and `runDueSlot` short
