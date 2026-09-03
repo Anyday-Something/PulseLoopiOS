@@ -26,6 +26,27 @@ final class LuckRingDriverTests: XCTestCase {
         parts.flatMap { $0 }
     }
 
+    // MARK: Trace
+
+    func testEveryPacketLeavesATraceAndTheFrameDescriptionComesLast() {
+        let writer = FakeWriter()
+        let driver = LuckRingDriver(writer: writer)
+        let frame = LuckRingFrame(cmdType: .send, dataType: LuckRingDataType.historyHeart,
+                                  payload: cat([2, 0, 2], [UInt8](repeating: 0, count: 10)), seq: 1, devType: 1)
+        let pages = packets(frame)
+        XCTAssertEqual(pages.count, 2)
+
+        let head = driver.ingest(pages[0], from: notify)
+        guard case let .trace(headNote) = head.first, head.count == 1 else { return XCTFail("head must trace, got \(head)") }
+        XCTAssertTrue(headNote.contains("head historyHeart"), headNote)
+
+        let done = driver.ingest(pages[1], from: notify)
+        guard case .trace = done.last else { return XCTFail("the completed frame's description must come last") }
+        XCTAssertFalse(done.dropLast().contains { if case .trace = $0 { return true } else { return false } })
+        guard case let .trace(note) = done.last! else { return }
+        XCTAssertTrue(note.hasPrefix("K6 SEND historyHeart (8) 13 B"), note)
+    }
+
     // MARK: Auto-ACK
 
     func testDeviceSendIsAckedAndDecoded() {

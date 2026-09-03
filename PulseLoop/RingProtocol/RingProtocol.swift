@@ -161,6 +161,9 @@ enum RingDecodedEvent: Sendable {
     case timingHistoryFrame(cmd: Int, day: Int, frameIndex: Int)
     case timeSyncAck(timestamp: Date)
     case commandAck(commandId: UInt8)
+    /// A human-readable note about the wire itself (a frame's shape, a reassembly page) for the raw-packet
+    /// feed. Carries no metric; every consumer other than the debug trace ignores it.
+    case trace(String)
     case unknown(commandId: UInt8, raw: Data)
 
     var kind: String {
@@ -194,6 +197,7 @@ enum RingDecodedEvent: Sendable {
         case .timingHistoryFrame: return "timing_history_frame"
         case .timeSyncAck: return "time_sync_ack"
         case .commandAck: return "command_ack"
+        case let .trace(note): return note
         case .unknown: return "unknown"
         }
     }

@@ -87,6 +87,83 @@ enum LuckRingDataType {
     static let unbind: UInt8 = 159
 }
 
+extension LuckRingDataType {
+    /// Debug-feed name for a `dataType`; unknown opcodes keep their number.
+    static func name(_ dataType: UInt8) -> String {
+        switch dataType {
+        case devInfo: return "devInfo"
+        case battery: return "battery"
+        case realSport: return "realSport"
+        case historySport: return "historySport"
+        case sleep: return "sleep"
+        case realHeart: return "realHeart"
+        case historyHeart: return "historyHeart"
+        case devSync: return "devSync"
+        case mixSport: return "mixSport"
+        case findDevice: return "findDevice"
+        case functionControl: return "functionControl"
+        case exerciseHeart: return "exerciseHeart"
+        case realBP: return "realBP"
+        case realO2: return "realO2"
+        case realHR: return "realHR"
+        case historyO2: return "historyO2"
+        case historyBP: return "historyBP"
+        case historyHRV: return "historyHRV"
+        case realHRV: return "realHRV"
+        case realTemp: return "realTemp"
+        case historyTemp: return "historyTemp"
+        case stress: return "stress"
+        case stressHistory: return "stressHistory"
+        case userInfo: return "userInfo"
+        case language: return "language"
+        case time: return "time"
+        case dataSwitch: return "dataSwitch"
+        case mixInfo: return "mixInfo"
+        case goals: return "goals"
+        case reset: return "reset"
+        case pairFinish: return "pairFinish"
+        case heartAutoSwitch: return "heartAutoSwitch"
+        case callAlarm: return "callAlarm"
+        case unbind: return "unbind"
+        default: return "type\(dataType)"
+        }
+    }
+}
+
+/// One-line descriptions of K6 wire traffic for the raw-packet feed, so a multi-page frame can be
+/// followed page by page instead of showing up as a run of "unknown" 20-byte packets.
+enum LuckRingTrace {
+    static func frame(_ frame: LuckRingFrame) -> String {
+        let cmd: String
+        switch frame.cmdType {
+        case .send: cmd = "SEND"
+        case .sendNoAck: cmd = "SEND_NOACK"
+        case .request: cmd = "REQUEST"
+        case .ack: cmd = "ACK"
+        }
+        var text = "K6 \(cmd) \(LuckRingDataType.name(frame.dataType)) (\(frame.dataType)) \(frame.payload.count) B"
+        if frame.cmdType == .ack {
+            text += frame.payload.first == 1 ? " accepted" : " status \(frame.payload.first ?? 0)"
+        } else if frame.payload.count >= 3 {
+            text += " · \(frame.payload[2]) items"
+        }
+        return text
+    }
+
+    /// A packet that did not complete a frame: the head of a multi-page frame, one of its pages, or a
+    /// page that arrived with nothing to attach to.
+    static func partial(_ packet: Data, inFlight: LuckRingFrameAssembler.InFlight?) -> String {
+        let bytes = [UInt8](packet)
+        guard bytes.count >= LuckRingPacketizer.packetSize else { return "K6 short packet (\(bytes.count) B)" }
+        guard let inFlight else { return "K6 dropped page \(bytes[0]) (no frame in flight)" }
+        let name = LuckRingDataType.name(inFlight.dataType)
+        if bytes[0] == 0 {
+            return "K6 head \(name) (\(inFlight.dataType)) \(inFlight.declaredLength) B in \(inFlight.totalPages + 1) packets"
+        }
+        return "K6 page \(inFlight.receivedPages)/\(inFlight.totalPages) of \(name)"
+    }
+}
+
 /// Little-endian helpers. Every K6 integer is LE (`ByteUtil.int2bytes2` / `intToByte4` / `byte4ToInt`).
 enum LuckRingBytes {
     static func u16(_ b: [UInt8], _ i: Int) -> Int {
@@ -213,6 +290,18 @@ final class LuckRingFrameAssembler {
     }
 
     private var partial: Partial?
+
+    /// What is being reassembled right now, for the debug trace.
+    struct InFlight: Equatable {
+        let dataType: UInt8
+        let receivedPages: Int
+        let totalPages: Int
+        let declaredLength: Int
+    }
+
+    var inFlight: InFlight? {
+        partial.map { InFlight(dataType: $0.dataType, receivedPages: $0.receivedPages, totalPages: $0.totalPages, declaredLength: $0.declaredLength) }
+    }
 
     /// Drop any half-assembled frame. A fresh driver is built per connection, so this is for reconnects
     /// that reuse one (and for tests).
