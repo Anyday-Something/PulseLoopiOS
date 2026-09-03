@@ -495,7 +495,9 @@ struct PairingView: View {
     }
 
     private func ringRow(_ ring: RingBLEClient.DiscoveredRing) -> some View {
-        let signalLevel: String = ring.rssi >= -65 ? "Strong signal"
+        // A system-connected ring has no RSSI: the phone is already linked to it (Settings > Bluetooth).
+        let signalLevel: String = ring.isSystemConnected ? "Connected in iOS Settings"
+            : ring.rssi >= -65 ? "Strong signal"
             : ring.rssi >= -80 ? "Medium signal"
             : "Weak signal"
         // Maturity is a property of the family we would actually drive, so the matched family wins over
@@ -516,10 +518,17 @@ struct PairingView: View {
                         SupportBadge(level: support) // renders nothing for fully-supported families
                     }
                 }
+                if ring.isSystemConnected {
+                    Text("Connected in iOS Settings")
+                        .font(.caption2)
+                        .foregroundStyle(PulseColors.textMuted)
+                }
             }
             Spacer()
-            SignalStrengthDots(rssi: ring.rssi) // §5
-                .accessibilityHidden(true) // §5 row provides spoken signal level
+            if !ring.isSystemConnected {
+                SignalStrengthDots(rssi: ring.rssi) // §5
+                    .accessibilityHidden(true) // §5 row provides spoken signal level
+            }
         }
         .padding(.vertical, 10)
         .padding(.horizontal, 12)

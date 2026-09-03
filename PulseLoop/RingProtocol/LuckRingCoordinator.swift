@@ -21,6 +21,10 @@ final class LuckRingCoordinator: WearableCoordinator {
     /// single signal the vendor app itself matches on, so it is authoritative.
     static let manufacturerHexPrefix = "64ff"
 
+    /// The TK18 sits in iOS Settings > Bluetooth once the vendor app has bound it and stops advertising for
+    /// as long as that system link is up. Looking it up by its protocol service is the only way to list it.
+    static let systemConnectedLookupServices: [CBUUID] = [CBUUID(string: "F618")]
+
     static func matches(name: String?, advertisement: AdvertisementInfo) -> Bool {
         if advertisesService(advertisement) { return true }
         if let mfg = advertisement.manufacturerData, mfg.hexString.hasPrefix(manufacturerHexPrefix) {
