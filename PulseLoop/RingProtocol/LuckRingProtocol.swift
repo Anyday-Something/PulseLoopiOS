@@ -88,45 +88,21 @@ enum LuckRingDataType {
 }
 
 extension LuckRingDataType {
+    private static let names: [UInt8: String] = [
+        devInfo: "devInfo", battery: "battery", realSport: "realSport", historySport: "historySport",
+        sleep: "sleep", realHeart: "realHeart", historyHeart: "historyHeart", devSync: "devSync",
+        mixSport: "mixSport", findDevice: "findDevice", functionControl: "functionControl",
+        exerciseHeart: "exerciseHeart", realBP: "realBP", realO2: "realO2", realHR: "realHR",
+        historyO2: "historyO2", historyBP: "historyBP", historyHRV: "historyHRV", realHRV: "realHRV",
+        realTemp: "realTemp", historyTemp: "historyTemp", stress: "stress", stressHistory: "stressHistory",
+        userInfo: "userInfo", language: "language", time: "time", dataSwitch: "dataSwitch",
+        mixInfo: "mixInfo", goals: "goals", reset: "reset", pairFinish: "pairFinish",
+        heartAutoSwitch: "heartAutoSwitch", callAlarm: "callAlarm", unbind: "unbind",
+    ]
+
     /// Debug-feed name for a `dataType`; unknown opcodes keep their number.
     static func name(_ dataType: UInt8) -> String {
-        switch dataType {
-        case devInfo: return "devInfo"
-        case battery: return "battery"
-        case realSport: return "realSport"
-        case historySport: return "historySport"
-        case sleep: return "sleep"
-        case realHeart: return "realHeart"
-        case historyHeart: return "historyHeart"
-        case devSync: return "devSync"
-        case mixSport: return "mixSport"
-        case findDevice: return "findDevice"
-        case functionControl: return "functionControl"
-        case exerciseHeart: return "exerciseHeart"
-        case realBP: return "realBP"
-        case realO2: return "realO2"
-        case realHR: return "realHR"
-        case historyO2: return "historyO2"
-        case historyBP: return "historyBP"
-        case historyHRV: return "historyHRV"
-        case realHRV: return "realHRV"
-        case realTemp: return "realTemp"
-        case historyTemp: return "historyTemp"
-        case stress: return "stress"
-        case stressHistory: return "stressHistory"
-        case userInfo: return "userInfo"
-        case language: return "language"
-        case time: return "time"
-        case dataSwitch: return "dataSwitch"
-        case mixInfo: return "mixInfo"
-        case goals: return "goals"
-        case reset: return "reset"
-        case pairFinish: return "pairFinish"
-        case heartAutoSwitch: return "heartAutoSwitch"
-        case callAlarm: return "callAlarm"
-        case unbind: return "unbind"
-        default: return "type\(dataType)"
-        }
+        names[dataType] ?? "type\(dataType)"
     }
 }
 
@@ -300,7 +276,10 @@ final class LuckRingFrameAssembler {
     }
 
     var inFlight: InFlight? {
-        partial.map { InFlight(dataType: $0.dataType, receivedPages: $0.receivedPages, totalPages: $0.totalPages, declaredLength: $0.declaredLength) }
+        partial.map {
+            InFlight(dataType: $0.dataType, receivedPages: $0.receivedPages,
+                     totalPages: $0.totalPages, declaredLength: $0.declaredLength)
+        }
     }
 
     /// Drop any half-assembled frame. A fresh driver is built per connection, so this is for reconnects
