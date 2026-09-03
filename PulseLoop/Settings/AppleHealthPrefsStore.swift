@@ -34,7 +34,7 @@ struct AppleHealthPrefs: Codable, Equatable {
     /// nutrition feature's own master toggle is also on.
     var syncNutrition = true
     /// Land on "Compare sources" (Apple Health across every writer) on every launch. Default off.
-    var openCompareOnLaunch = false
+    var openCompareOnLaunch = true   // local build: Compare is the landing screen
     /// Backfill decision captured on first enable. Default `.notAsked`.
     var backfillChoice: HealthBackfillChoice = .notAsked
 
