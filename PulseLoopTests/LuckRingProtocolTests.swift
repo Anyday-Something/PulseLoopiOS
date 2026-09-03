@@ -112,6 +112,24 @@ final class LuckRingProtocolTests: XCTestCase {
         XCTAssertEqual(completed, fresh, "a fresh head mid-assembly abandons the stale partial and completes")
     }
 
+    func testAssemblerKeepsAPartialFrameAcrossADeviceAck() {
+        let assembler = LuckRingFrameAssembler()
+        // The ring's post-bind history push: a multi-page sleep frame (type 6) whose continuation pages
+        // are interleaved with the ACK heads the ring sends for the app's own startup REQUESTs.
+        let payload = (0..<40).map { UInt8($0) }
+        let sleep = LuckRingFrame(cmdType: .send, dataType: 6, payload: payload, seq: 2, devType: 1)
+        let packets = packetizer.packets(for: sleep)
+        XCTAssertEqual(packets.count, 3)
+
+        XCTAssertNil(assembler.append(packets[0]))
+        XCTAssertNil(assembler.append(packets[1]))
+        var ack = [UInt8](repeating: 0, count: 20)
+        ack[1] = 1; ack[3] = 9; ack[4] = 4; ack[5] = 3; ack[8] = 1; ack[10] = 1
+        let ackFrame = assembler.append(Data(ack))
+        XCTAssertEqual(ackFrame?.cmdType, .ack, "the ACK is still surfaced")
+        XCTAssertEqual(assembler.append(packets[2]), sleep, "and the sleep frame completes after it")
+    }
+
     func testAssemblerDropsAContinuationWithNoHead() {
         let assembler = LuckRingFrameAssembler()
         var continuation = [UInt8](repeating: 0, count: 20)

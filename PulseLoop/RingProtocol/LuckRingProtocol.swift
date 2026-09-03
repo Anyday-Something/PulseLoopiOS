@@ -193,10 +193,10 @@ struct LuckRingPacketizer {
 /// Reassembles 20-byte notify packets into whole logical frames.
 ///
 /// A head packet (`[0]==0`) starts a frame and declares its payload length at `[8..9]` and its
-/// continuation count at `[2]`; a device ACK head (`[4]==4`) is self-contained. Continuations
-/// (`[0]!=0`) must arrive in strict 1-based order. A fresh head mid-assembly abandons the partial one
-/// (`queue/b.java` overwrites its single buffer), and a continuation with no head is dropped — so one
-/// truncated frame after a disconnect can't poison the next.
+/// continuation count at `[2]`; a device ACK head (`[4]==4`) is self-contained and leaves any frame in
+/// assembly untouched. Continuations (`[0]!=0`) must arrive in strict 1-based order. A fresh *data* head
+/// mid-assembly abandons the partial one (`queue/b.java` overwrites its single buffer), and a
+/// continuation with no head is dropped — so one truncated frame after a disconnect can't poison the next.
 @MainActor
 final class LuckRingFrameAssembler {
     nonisolated deinit {}   // skip the main-actor isolated-deinit hop (crashes on older sim runtimes)
@@ -236,9 +236,12 @@ final class LuckRingFrameAssembler {
         let dataType = bytes[5]
         let cmdType = LuckRingCmdType(rawValue: rawCmd) ?? .send
 
-        // A device ACK is a complete, single-packet frame — its status byte is at [10].
+        // A device ACK is a complete, single-packet frame — its status byte is at [10]. It must **not**
+        // abandon a frame that is mid-assembly: the ring answers the app's startup REQUESTs with ACK heads
+        // while it is still streaming the continuation pages of its post-bind history push, and dropping
+        // the partial here is exactly how a multi-page sleep frame went missing on a TK18 (the pages after
+        // the ACK then arrive with no head and are discarded one by one).
         if cmdType == .ack {
-            partial = nil
             return LuckRingFrame(cmdType: .ack, dataType: dataType, payload: [bytes[10]], seq: seq, devType: devType)
         }
 
