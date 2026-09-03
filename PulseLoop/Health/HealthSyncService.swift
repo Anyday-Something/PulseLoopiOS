@@ -197,9 +197,14 @@ final class HealthSyncService {
                                  counts: inout SyncCounts, now: Date, device: HKDevice?) async throws {
         let raw = kind.rawValue
         let mockRaw = MeasurementSource.mock.rawValue
+        // Rows imported *from* Health are already there under their original source; writing them back
+        // would double every one of them under PulseLoop's name.
+        let importRaw = MeasurementSource.healthImport.rawValue
         let watermark = state.measurementWatermarks[raw] ?? .distantPast
         let descriptor = FetchDescriptor<Measurement>(
-            predicate: #Predicate { $0.kindRaw == raw && $0.sourceRaw != mockRaw && $0.createdAt > watermark },
+            predicate: #Predicate {
+                $0.kindRaw == raw && $0.sourceRaw != mockRaw && $0.sourceRaw != importRaw && $0.createdAt > watermark
+            },
             sortBy: [SortDescriptor(\.createdAt, order: .forward)]
         )
         let rows = (try? context.fetch(descriptor)) ?? []
@@ -361,8 +366,11 @@ final class HealthSyncService {
         let sessions = (try? context.fetch(descriptor)) ?? []
         guard !sessions.isEmpty else { return }
 
+        // Nights that came *out of* Health (`HealthImportService`) are already there under their original
+        // source; exporting them would double every block under PulseLoop's name.
+        let imported = HealthImportService.importedSleepSessionIDs(context: context)
         var samples: [HKCategorySample] = []
-        for session in sessions {
+        for session in sessions where !imported.contains(session.id) {
             samples.append(contentsOf: sleepSamples(session: session, type: sleepType, context: context, now: now, device: device))
         }
         if !samples.isEmpty {

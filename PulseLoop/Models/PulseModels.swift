@@ -53,6 +53,9 @@ enum MeasurementSource: String, Codable, CaseIterable {
     case manual
     case live
     case colmi
+    /// Read back out of Apple Health from another app or device (see `HealthImportService`). Never
+    /// exported again — it is already in Health under its original source.
+    case healthImport = "health_import"
 }
 
 enum SleepStage: String, Codable, CaseIterable {
