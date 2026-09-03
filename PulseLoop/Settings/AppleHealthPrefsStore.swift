@@ -33,6 +33,8 @@ struct AppleHealthPrefs: Codable, Equatable {
     /// Whether logged meals export as dietary samples (energy + macros). Only effective when the
     /// nutrition feature's own master toggle is also on.
     var syncNutrition = true
+    /// Land on "Compare sources" (Apple Health across every writer) on every launch. Default off.
+    var openCompareOnLaunch = false
     /// Backfill decision captured on first enable. Default `.notAsked`.
     var backfillChoice: HealthBackfillChoice = .notAsked
 

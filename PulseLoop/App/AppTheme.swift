@@ -32,6 +32,8 @@ enum AppRoute: Hashable {
     case pairing
     case debug
     case componentGallery
+    /// One day of Apple Health across every source (Watch vs. ring), read-only.
+    case compareSources
 }
 
 enum MainTab: String, CaseIterable, Identifiable {

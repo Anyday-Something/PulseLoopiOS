@@ -107,6 +107,10 @@ struct RootAppView: View {
                 if UserDefaults.standard.bool(forKey: "openRecord") {
                     path.append(AppRoute.recordSelect)
                 }
+                // Opt-in (Settings > Apple Health): land on the source comparison every launch.
+                if AppleHealthPrefsStore.shared.prefs.openCompareOnLaunch {
+                    path.append(AppRoute.compareSources)
+                }
                 // Re-attach to an in-progress workout left running across launches.
                 liveWorkout.recover()
                 routeDeepLinkIfNeeded()
@@ -182,6 +186,8 @@ struct RootAppView: View {
                     MealDetailView(mealId: id, path: $path)
                 case .pairing:
                     PairingView(onConnected: { path.removeLast() })
+                case .compareSources:
+                    CompareSourcesView()
                 case .debug:
                     DebugView()
                 case .componentGallery:
@@ -433,7 +439,17 @@ struct AppHeader: View {
                 }
             }
             Spacer(minLength: 8)
-            // Clean top bar: just the live connection status. Settings is in the tab
+            // Compare sources: Apple Health across every writer (Watch vs. ring), one tap away.
+            Button { path.append(AppRoute.compareSources) } label: {
+                Image(systemName: "chart.xyaxis.line")
+                    .font(PulseFont.headline.weight(.regular))
+                    .foregroundStyle(PulseColors.textSecondary)
+                    .padding(8)
+                    .pulseGlass(Circle(), interactive: true)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Compare sources")
+            // Clean top bar: the live connection status. Settings is in the tab
             // bar; Coach is the floating bubble above the tab bar.
             ConnectionStatusPill(state: effectiveState, batteryPercent: effectiveBattery)
                 .font(PulseFont.headline.weight(.regular))
