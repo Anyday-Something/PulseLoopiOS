@@ -143,12 +143,27 @@ art and a fallback name.
 - Device-info reply reports a 5-part dotted version (customer.hardware.code.picture.font)
 - OTA is in-band / via the `FF12` service in the vendor app; not implemented in PulseLoop
 
+## Pairing: the ring hides behind iOS Settings
+
+Once the LuckRing app has bound a TK18, the ring appears in **Settings > Bluetooth** as a connected
+device and the phone keeps that link up on its own. A peripheral in that state **does not advertise**,
+so no scan — PulseLoop's, nRF Connect's, or a Mac's — ever sees it. PulseLoop therefore also lists
+rings the phone is already linked to (`retrieveConnectedPeripherals` by the `F618` service), shown as
+"Connected in iOS Settings" at the top of the pairing list. Forgetting the ring in Settings > Bluetooth
+is *not* required, but if you do, it advertises again and a normal scan finds it.
+
 ## Background behavior
 
 - The ring only logs autonomously after the auto-monitoring config is pushed
   (firmware default: off) — PulseLoop sends it on every connect
 - No keepalive needed; the link stays up and history re-syncs every 30 minutes
   while connected, plus a post-workout vitals pass
+- Observed on firmware `227.1.1.1.0` (TK18, 2026-09): the ring **pushes** its stored history
+  unsolicited right after the MixInfo bind bundle (types 8, 42, 47, 5, 4, 9), once, and answers an
+  explicit `REQUEST` for 6 / 8 / 40 with an empty envelope. PulseLoop decodes every inbound frame
+  regardless of the pager, so the push lands; the pager's requests are effectively a no-op on this
+  firmware. New records arrive as further pushes while the link stays up (temperature every ~10 min
+  observed). The ring's own heads carry devType `0xE3` and cmdType `0x21` (bit 0x20 set on SEND).
 - History horizon: PulseLoop drops samples older than ~8 days on ingest
 
 ## Hackability

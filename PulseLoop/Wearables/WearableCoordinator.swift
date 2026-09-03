@@ -70,6 +70,14 @@ protocol WearableCoordinator {
     /// First coordinator in the registry whose `matches` returns true wins.
     static func matches(name: String?, advertisement: AdvertisementInfo) -> Bool
 
+    /// GATT services to look this family up by when the phone **already holds a link** to the ring
+    /// (`CBCentralManager.retrieveConnectedPeripherals(withServices:)`). A ring that is bonded at the
+    /// iOS level — listed in Settings > Bluetooth, which the LuckRing vendor app does to the TK18 — never
+    /// advertises while that link is up, so a scan alone can never find it. Empty (the default) opts a
+    /// family out; a peripheral found this way is then run through `matches` as if it had advertised
+    /// exactly these services, so the family's own matcher still decides.
+    static var systemConnectedLookupServices: [CBUUID] { get }
+
     /// Everything this device can do — drives capability-gated UI.
     var capabilities: Set<WearableCapability> { get }
 
@@ -97,6 +105,9 @@ protocol WearableCoordinator {
 
 extension WearableCoordinator {
     var displayName: String { Self.deviceType.displayName }
+
+    /// Families opt in explicitly; nothing is looked up by default.
+    static var systemConnectedLookupServices: [CBUUID] { [] }
 
     /// Nothing is bitmap-gated unless a family opts in, so jring / QRing-Colmi — neither of which speaks
     /// YCBT, and so has no bitmap to consult — keep their static sets. Both YCBT families opt in.

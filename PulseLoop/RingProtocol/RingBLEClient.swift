@@ -97,6 +97,10 @@ final class RingBLEClient: NSObject {
         let deviceType: RingDeviceType?
         /// Exact catalog model inferred from the Bluetooth local name, when recognizable.
         let wearableModelID: String?
+        /// Found through `retrieveConnectedPeripherals`, not an advertisement: the phone already holds a
+        /// link to it (it is listed in Settings > Bluetooth). Such a ring has no RSSI and cannot be
+        /// discovered by scanning at all — see `WearableCoordinator.systemConnectedLookupServices`.
+        var isSystemConnected: Bool = false
     }
 
     // MARK: Observable state (read by SwiftUI)
@@ -230,6 +234,29 @@ final class RingBLEClient: NSObject {
         // Scan with no service filter so we also catch firmwares that don't advertise their service
         // UUID; matching is done in didDiscover via the coordinator registry.
         central.scanForPeripherals(withServices: nil, options: [CBCentralManagerScanOptionAllowDuplicatesKey: false])
+        surfaceSystemConnectedPeripherals()
+    }
+
+    /// List rings the phone is already linked to. A ring bonded at the iOS level (Settings > Bluetooth)
+    /// does not advertise while that link is up, so `didDiscover` never fires for it; the LuckRing/TK18 is
+    /// one such ring after the vendor app has bound it. Each opted-in family is looked up by its own
+    /// services and the result is pushed through the same registration path as an advertisement, carrying
+    /// those services so the family's matcher claims it exactly as it would a scan hit.
+    private func surfaceSystemConnectedPeripherals() {
+        for coordinator in Self.coordinators {
+            let services = coordinator.systemConnectedLookupServices
+            guard !services.isEmpty else { continue }
+            for peripheral in central.retrieveConnectedPeripherals(withServices: services)
+            where discoveredPeripherals[peripheral.identifier] == nil {
+                register(
+                    peripheral,
+                    name: peripheral.name,
+                    advertisement: AdvertisementInfo(serviceUUIDs: services, manufacturerData: nil),
+                    rssi: 0,
+                    isSystemConnected: true
+                )
+            }
+        }
     }
 
     func stopScanning() {
@@ -655,12 +682,6 @@ final class RingBLEClient: NSObject {
 
     /// Lift CoreBluetooth's raw advertisement dictionary into `AdvertisementInfo` and claim it against
     /// the registry.
-    private func matchDeviceType(name: String?, advertisementData: [String: Any]) -> RingDeviceType? {
-        Self.matchDeviceType(name: name, advertisement: AdvertisementInfo(
-            serviceUUIDs: (advertisementData[CBAdvertisementDataServiceUUIDsKey] as? [CBUUID]) ?? [],
-            manufacturerData: advertisementData[CBAdvertisementDataManufacturerDataKey] as? Data
-        ))
-    }
 }
 
 // MARK: - RingCommandWriter
@@ -725,33 +746,59 @@ extension RingBLEClient: CBCentralManagerDelegate {
     ) {
         MainActor.assumeIsolated {
             let name = (advertisementData[CBAdvertisementDataLocalNameKey] as? String) ?? peripheral.name
-            let matchedType = matchDeviceType(name: name, advertisementData: advertisementData)
-            let matchedModel = WearableModel.model(advertisedName: name)
-            // List any *named* peripheral so the user can always find their ring, even if its
-            // advertisement omits the service UUID / manufacturer bytes; recognized rings sort first.
-            guard let displayName = name, !displayName.isEmpty else { return }
-            discoveredPeripherals[peripheral.identifier] = peripheral
-            // Keep the model tag when the matched family is *any* the card can resolve to, not just its
-            // default — a Colmi claimed as `.colmiSmartHealth` is still a "Colmi R09".
-            let modelID: String? = {
-                guard let matchedModel, let matchedType,
-                      matchedModel.families.contains(matchedType) else { return nil }
-                return matchedModel.id
-            }()
-            let ring = DiscoveredRing(
-                id: peripheral.identifier,
-                name: displayName,
+            register(
+                peripheral,
+                name: name,
+                advertisement: AdvertisementInfo(
+                    serviceUUIDs: (advertisementData[CBAdvertisementDataServiceUUIDsKey] as? [CBUUID]) ?? [],
+                    manufacturerData: advertisementData[CBAdvertisementDataManufacturerDataKey] as? Data
+                ),
                 rssi: RSSI.intValue,
-                isLikelyRing: matchedType != nil,
-                deviceType: matchedType,
-                wearableModelID: modelID
+                isSystemConnected: false
             )
-            if let index = discovered.firstIndex(where: { $0.id == ring.id }) {
-                discovered[index] = ring
-            } else {
-                discovered.append(ring)
-            }
-            discovered.sort { ($0.isLikelyRing ? 0 : 1, -$0.rssi) < ($1.isLikelyRing ? 0 : 1, -$1.rssi) }
+        }
+    }
+
+    /// Shared registration for a scanned advertisement and a system-connected lookup hit: match the
+    /// family, tag the model, and upsert the row. System-connected rings sort first (they are the ones
+    /// the user set up on this phone), then recognized rings, then by signal.
+    private func register(
+        _ peripheral: CBPeripheral,
+        name: String?,
+        advertisement: AdvertisementInfo,
+        rssi: Int,
+        isSystemConnected: Bool
+    ) {
+        let matchedType = Self.matchDeviceType(name: name, advertisement: advertisement)
+        let matchedModel = WearableModel.model(advertisedName: name)
+        // List any *named* peripheral so the user can always find their ring, even if its
+        // advertisement omits the service UUID / manufacturer bytes; recognized rings sort first.
+        guard let displayName = name, !displayName.isEmpty else { return }
+        discoveredPeripherals[peripheral.identifier] = peripheral
+        // Keep the model tag when the matched family is *any* the card can resolve to, not just its
+        // default — a Colmi claimed as `.colmiSmartHealth` is still a "Colmi R09".
+        let modelID: String? = {
+            guard let matchedModel, let matchedType,
+                  matchedModel.families.contains(matchedType) else { return nil }
+            return matchedModel.id
+        }()
+        let ring = DiscoveredRing(
+            id: peripheral.identifier,
+            name: displayName,
+            rssi: rssi,
+            isLikelyRing: matchedType != nil,
+            deviceType: matchedType,
+            wearableModelID: modelID,
+            isSystemConnected: isSystemConnected
+        )
+        if let index = discovered.firstIndex(where: { $0.id == ring.id }) {
+            discovered[index] = ring
+        } else {
+            discovered.append(ring)
+        }
+        discovered.sort {
+            ($0.isSystemConnected ? 0 : 1, $0.isLikelyRing ? 0 : 1, -$0.rssi)
+                < ($1.isSystemConnected ? 0 : 1, $1.isLikelyRing ? 0 : 1, -$1.rssi)
         }
     }
 
