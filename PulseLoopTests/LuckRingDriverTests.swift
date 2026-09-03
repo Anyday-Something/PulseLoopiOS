@@ -14,6 +14,9 @@ final class LuckRingDriverTests: XCTestCase {
     }
 
     private let notify = CBUUID(string: LuckRingUUIDs.notify)
+
+    // The driver now describes every packet with a `.trace` for the debug feed; these tests are about
+    // the metrics, so they look past those.
     private let packetizer = LuckRingPacketizer()
 
     private func packets(_ frame: LuckRingFrame) -> [Data] {
@@ -104,11 +107,11 @@ final class LuckRingDriverTests: XCTestCase {
         let wire = packets(frame)
         XCTAssertGreaterThan(wire.count, 1)
 
-        let firstEvents = driver.ingest(wire[0], from: notify)
+        let firstEvents = driver.ingest(wire[0], from: notify).metrics
         XCTAssertTrue(firstEvents.isEmpty, "no decode until the frame is whole")
         XCTAssertTrue(writer.sent.isEmpty, "no ACK until the frame is whole")
 
-        let lastEvents = driver.ingest(wire[1], from: notify)
+        let lastEvents = driver.ingest(wire[1], from: notify).metrics
         XCTAssertEqual(writer.sent.count, 1, "ACK once, on completion")
         XCTAssertEqual(lastEvents.count, 2, "both HR records decode")
     }
@@ -126,9 +129,16 @@ final class LuckRingDriverTests: XCTestCase {
 
         _ = driver.ingest(wire[0], from: notify)   // head only
         driver.connectionDidStart()                // the link came back — discard the partial
-        let events = driver.ingest(wire[1], from: notify)   // a continuation with no head now
+        let events = driver.ingest(wire[1], from: notify).metrics   // a continuation with no head now
 
         XCTAssertTrue(events.isEmpty, "the reset dropped the partial, so the stray continuation is ignored")
         XCTAssertTrue(writer.sent.isEmpty)
+    }
+}
+
+private extension Array where Element == RingDecodedEvent {
+    /// Everything except the wire-trace notes.
+    var metrics: [RingDecodedEvent] {
+        filter { if case .trace = $0 { return false } else { return true } }
     }
 }
