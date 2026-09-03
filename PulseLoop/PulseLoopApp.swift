@@ -164,6 +164,8 @@ struct PulseLoopApp: App {
             // Refresh the learned resting-HR baseline on foreground (6h-throttled no-op usually).
             if !Self.isRunningUnitTests {
                 RestingHRBaselineService.refreshIfStale(context: container.mainContext)
+                // Pull in what other apps wrote to Apple Health since last time (opt-in, throttled).
+                HealthImportService.shared.importIfDue(context: container.mainContext)
             }
             // Foreground reconnect: the OS can silently tear down the BLE link while suspended without
             // delivering a disconnect, leaving us "connected" but dead. On every resume, re-link the
