@@ -44,6 +44,9 @@ struct AppleHealthSettingsView: View {
                     .disabled(!masterOn)
                     .opacity(masterOn ? 1 : 0.5)
 
+                // Not gated on the master toggle: comparing reads Health, it never writes.
+                compareGroup
+
                 dangerGroup
             }
             .padding()
@@ -104,6 +107,28 @@ struct AppleHealthSettingsView: View {
             FormToggleRow(title: "Temperature", isOn: prefBinding(\.syncTemperature))
             FormToggleRow(title: "Sleep", isOn: prefBinding(\.syncSleep))
             FormToggleRow(title: "Steps & activity", isOn: prefBinding(\.syncActivity))
+        }
+    }
+
+    @ViewBuilder private var compareGroup: some View {
+        SettingsGroup(
+            header: "Compare sources",
+            footer: "Reads Apple Health across every writer — the Apple Watch, PulseLoop, other ring apps — "
+                + "and draws the same day on top of each other. Green marks where they agree."
+        ) {
+            NavigationLink(value: AppRoute.compareSources) {
+                HStack {
+                    Text("Open Compare sources")
+                        .font(PulseFont.body)
+                        .foregroundStyle(PulseColors.textPrimary)
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(PulseFont.caption)
+                        .foregroundStyle(PulseColors.textMuted)
+                }
+                .padding(.vertical, 6)
+            }
+            FormToggleRow(title: "Open on launch", isOn: prefBinding(\.openCompareOnLaunch))
         }
     }
 
