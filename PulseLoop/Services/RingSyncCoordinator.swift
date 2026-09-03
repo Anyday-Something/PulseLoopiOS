@@ -392,25 +392,6 @@ final class RingSyncCoordinator {
         runStartupSequence()
     }
 
-    /// "Opening the app is enough": on every foreground, re-sync a connected ring whose last sync is
-    /// older than `staleAfter`. A ring that is not connected is left to the foreground reconnect, whose
-    /// connect handshake is the sync. Throttled so flipping between apps does not hammer the ring.
-    func syncOnForeground(staleAfter: TimeInterval = 120, now: Date = Date()) {
-        guard client.state == .connected else { return }
-        if let last = lastSyncAt, now.timeIntervalSince(last) < staleAfter { return }
-        runStartupSequence()
-    }
-
-    /// The "Sync ring" home-screen quick action: sync a connected ring, or bring the link up (the
-    /// connect handshake then runs the sync).
-    func handleQuickSync() {
-        if client.state == .connected {
-            runStartupSequence()
-        } else {
-            client.connectLastKnown()
-        }
-    }
-
     /// Pull-to-refresh entry point. When connected, re-run the sync sequence; otherwise try to
     /// (re)connect so a pull-down can recover the link. The brief wait keeps the refresh spinner
     /// on screen while replies stream back in.
@@ -952,4 +933,27 @@ extension RingSyncCoordinator: RingSyncGating {
     var isSyncInFlight: Bool { isSyncing }
     func beginSync() { syncNow() }
     func connectAndSync() async { await pullToRefresh() }
+}
+
+// MARK: - Foreground sync + quick action
+
+extension RingSyncCoordinator {
+    /// "Opening the app is enough": on every foreground, re-sync a connected ring whose last sync is
+    /// older than `staleAfter`. A ring that is not connected is left to the foreground reconnect, whose
+    /// connect handshake is the sync. Throttled so flipping between apps does not hammer the ring.
+    func syncOnForeground(staleAfter: TimeInterval = 120, now: Date = Date()) {
+        guard client.state == .connected else { return }
+        if let last = lastSyncAt, now.timeIntervalSince(last) < staleAfter { return }
+        runStartupSequence()
+    }
+
+    /// The "Sync ring" home-screen quick action: sync a connected ring, or bring the link up (the
+    /// connect handshake then runs the sync).
+    func handleQuickSync() {
+        if client.state == .connected {
+            runStartupSequence()
+        } else {
+            client.connectLastKnown()
+        }
+    }
 }
