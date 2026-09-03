@@ -4,6 +4,8 @@ import UIKit
 import OSLog
 
 struct RootAppView: View {
+    /// Launch-only gate for `openCompareOnLaunch` (see the root `.task`).
+    @State private var openedCompareThisLaunch = false
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
     @Environment(LiveWorkoutManager.self) private var liveWorkout
@@ -107,8 +109,11 @@ struct RootAppView: View {
                 if UserDefaults.standard.bool(forKey: "openRecord") {
                     path.append(AppRoute.recordSelect)
                 }
-                // Opt-in (Settings > Apple Health): land on the source comparison every launch.
-                if AppleHealthPrefsStore.shared.prefs.openCompareOnLaunch {
+                // Opt-in (Settings > Apple Health): land on the source comparison once per launch. The
+                // root re-runs this task every time a pushed screen pops back to it, so gate it — otherwise
+                // "back" would push Compare straight back on.
+                if AppleHealthPrefsStore.shared.prefs.openCompareOnLaunch, !openedCompareThisLaunch {
+                    openedCompareThisLaunch = true
                     path.append(AppRoute.compareSources)
                 }
                 // Re-attach to an in-progress workout left running across launches.
