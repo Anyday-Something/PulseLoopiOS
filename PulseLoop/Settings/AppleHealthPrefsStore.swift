@@ -33,6 +33,12 @@ struct AppleHealthPrefs: Codable, Equatable {
     /// Whether logged meals export as dietary samples (energy + macros). Only effective when the
     /// nutrition feature's own master toggle is also on.
     var syncNutrition = true
+    /// Read heart rate, SpO₂ and sleep written by *other* apps (another ring app, mostly) back out of
+    /// Apple Health into PulseLoop's own store. Default off.
+    var importFromHealth = true   // local build: pull LuckierRing's Health data in by default
+    /// Also import what the Apple Watch wrote. Off by default: its heart rate is dense and its sleep
+    /// would compete with the ring's for the same nights.
+    var importFromWatch = false
     /// Land on "Compare sources" (Apple Health across every writer) on every launch. Default off.
     var openCompareOnLaunch = true   // local build: Compare is the landing screen
     /// Backfill decision captured on first enable. Default `.notAsked`.

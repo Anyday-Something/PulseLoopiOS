@@ -12,6 +12,7 @@ struct AppleHealthSettingsView: View {
     @Environment(\.modelContext) private var modelContext
     @State private var service = HealthSyncService.shared
     @State private var store = AppleHealthPrefsStore.shared
+    @State private var importService = HealthImportService.shared
     /// First-enable backfill choice ("all history" vs "new only" vs cancel).
     @State private var showBackfillDialog = false
     /// Confirmation before deleting PulseLoop's samples out of Apple Health.
@@ -43,6 +44,9 @@ struct AppleHealthSettingsView: View {
                 actionsGroup
                     .disabled(!masterOn)
                     .opacity(masterOn ? 1 : 0.5)
+
+                // Not gated on the export toggle: importing only reads.
+                importGroup
 
                 // Not gated on the master toggle: comparing reads Health, it never writes.
                 compareGroup
@@ -107,6 +111,30 @@ struct AppleHealthSettingsView: View {
             FormToggleRow(title: "Temperature", isOn: prefBinding(\.syncTemperature))
             FormToggleRow(title: "Sleep", isOn: prefBinding(\.syncSleep))
             FormToggleRow(title: "Steps & activity", isOn: prefBinding(\.syncActivity))
+        }
+    }
+
+    @ViewBuilder private var importGroup: some View {
+        SettingsGroup(
+            header: "Import from Apple Health",
+            footer: "Reads heart rate, blood oxygen and sleep that other apps wrote into Apple Health — a ring "
+                + "synced by another app, for instance — into PulseLoop, so Sleep and Vitals show it here. "
+                + "Nothing imported is ever written back to Health."
+        ) {
+            FormToggleRow(title: "Import other apps' ring data", isOn: prefBinding(\.importFromHealth))
+            FormToggleRow(title: "Also import Apple Watch data", isOn: prefBinding(\.importFromWatch))
+                .disabled(!store.prefs.importFromHealth)
+                .opacity(store.prefs.importFromHealth ? 1 : 0.5)
+            QuickActionButton(label: importService.isImporting ? "Importing…" : "Import now") {
+                Task { await importService.importNow(context: modelContext) }
+            }
+            .disabled(importService.isImporting || !store.prefs.importFromHealth)
+            if let result = importService.lastResult {
+                Text(result)
+                    .font(.caption)
+                    .foregroundStyle(PulseColors.textMuted)
+                    .padding(.horizontal, 4)
+            }
         }
     }
 
