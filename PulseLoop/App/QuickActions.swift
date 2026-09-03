@@ -14,6 +14,8 @@ enum QuickAction: String, CaseIterable {
 @MainActor
 @Observable
 final class QuickActionRouter {
+    nonisolated deinit {}   // skip the main-actor isolated-deinit hop (crashes on older sim runtimes)
+
     static let shared = QuickActionRouter()
     private(set) var pending: QuickAction?
 
