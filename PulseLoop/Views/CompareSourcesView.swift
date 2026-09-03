@@ -19,6 +19,12 @@ struct CompareSourcesView: View {
     @State private var sleepFocus: String?
     @State private var spo2Focus: String?
     @State private var connecting = false
+    @State private var hrZoom = ChartZoom(full: 86_400, start: Calendar.current.startOfDay(for: Date()))
+    @State private var sleepZoom = ChartZoom(
+        full: 86_400,
+        start: Calendar.current.date(byAdding: .hour, value: -12, to: Calendar.current.startOfDay(for: Date())) ?? Date()
+    )
+    @State private var spo2Zoom = ChartZoom(full: 86_400, start: Calendar.current.startOfDay(for: Date()))
 
     private let reader = HealthSourceReader()
     private let calendar = Calendar.current
@@ -47,7 +53,8 @@ struct CompareSourcesView: View {
                     }
                 }
                 Text("Green = sources agree (heart rate within \(Int(SourceComparison.heartRateToleranceBpm)) bpm "
-                     + "in the same 5-minute bin; same sleep stage in the same minute). Tap a source to focus it.")
+                     + "in the same 5-minute bin; same sleep stage in the same minute). Tap a source to focus it; "
+                     + "pinch to zoom, drag to scroll, double-tap to reset.")
                     .font(PulseFont.caption2)
                     .foregroundStyle(PulseColors.textMuted)
                     .padding(.horizontal, 4)
@@ -58,7 +65,12 @@ struct CompareSourcesView: View {
         .background(PulseColors.background.ignoresSafeArea())
         .navigationTitle("Compare sources")
         .navigationBarTitleDisplayMode(.inline)
-        .task(id: day) { await load() }
+        .task(id: day) {
+            hrZoom.reset(to: day)
+            spo2Zoom.reset(to: day)
+            sleepZoom.reset(to: nightStart)
+            await load()
+        }
         .refreshable { await load() }
     }
 
@@ -142,8 +154,11 @@ struct CompareSourcesView: View {
                         }
                     }
                     .chartXScale(domain: day...dayEnd)
+                    .chartZoomable($hrZoom, start: day)
                     .chartXAxis {
-                        AxisMarks(values: .stride(by: .hour, count: 6)) { _ in AxisGridLine(); AxisValueLabel(format: .dateTime.hour()) }
+                        AxisMarks(values: .stride(by: .hour, count: hrZoom.visible < 6 * 3600 ? 1 : 6)) { _ in
+                            AxisGridLine(); AxisValueLabel(format: .dateTime.hour())
+                        }
                     }
                     .chartLegend(.hidden)
                     .frame(height: 230)
@@ -199,8 +214,11 @@ struct CompareSourcesView: View {
                     }
                     .chartYScale(domain: rows)
                     .chartXScale(domain: nightStart...nightEnd)
+                    .chartZoomable($sleepZoom, start: nightStart)
                     .chartXAxis {
-                        AxisMarks(values: .stride(by: .hour, count: 3)) { _ in AxisGridLine(); AxisValueLabel(format: .dateTime.hour()) }
+                        AxisMarks(values: .stride(by: .hour, count: sleepZoom.visible < 6 * 3600 ? 1 : 3)) { _ in
+                            AxisGridLine(); AxisValueLabel(format: .dateTime.hour())
+                        }
                     }
                     .chartYAxis {
                         AxisMarks { value in
@@ -264,8 +282,11 @@ struct CompareSourcesView: View {
                     }
                     .chartXScale(domain: day...dayEnd)
                     .chartYScale(domain: 85...100)
+                    .chartZoomable($spo2Zoom, start: day)
                     .chartXAxis {
-                        AxisMarks(values: .stride(by: .hour, count: 6)) { _ in AxisGridLine(); AxisValueLabel(format: .dateTime.hour()) }
+                        AxisMarks(values: .stride(by: .hour, count: spo2Zoom.visible < 6 * 3600 ? 1 : 6)) { _ in
+                            AxisGridLine(); AxisValueLabel(format: .dateTime.hour())
+                        }
                     }
                     .chartLegend(.hidden)
                     .frame(height: 170)
