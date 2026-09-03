@@ -64,7 +64,11 @@ final class LuckRingDriver: WearableDriver {
     // MARK: Inbound decode
 
     func ingest(_ data: Data, from characteristic: CBUUID) -> [RingDecodedEvent] {
-        guard let frame = assembler.append(data) else { return [] }
+        // A packet that only advances reassembly still gets a line in the raw-packet feed, so a
+        // multi-page history frame can be followed page by page.
+        guard let frame = assembler.append(data) else {
+            return [.trace(LuckRingTrace.partial(data, inFlight: assembler.inFlight))]
+        }
 
         // ACK a device-initiated SEND before decoding — the ring retransmits until we do.
         if frame.cmdType == .send {
@@ -76,7 +80,9 @@ final class LuckRingDriver: WearableDriver {
             historySync.noteReceived(dataType: frame.dataType)
         }
 
-        return decoder.decode(frame)
+        // The frame's own description goes last: consumers that look at the first event still see the
+        // metric, and the feed shows the shape of what just completed.
+        return decoder.decode(frame) + [.trace(LuckRingTrace.frame(frame))]
     }
 
     func makeSyncEngine() -> RingSyncEngine {
