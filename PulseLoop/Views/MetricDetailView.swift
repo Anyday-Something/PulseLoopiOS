@@ -14,6 +14,8 @@ struct MetricDetailView: View {
     @Query private var profiles: [UserProfile]
 
     @State private var period: DetailPeriod = .today
+    /// Pinch to zoom, drag to scroll, double-tap to reset on the detail chart.
+    @State private var zoom = ChartZoom(full: 86_400, start: Date())
     @State private var primary: [MetricSample] = []
     @State private var secondary: [MetricSample] = []   // diastolic, for BP
     /// Observed so the detail chart/tiles re-fetch when a background sync lands while this is open.
@@ -85,6 +87,12 @@ struct MetricDetailView: View {
         .onChange(of: dataChange.token) { _, _ in reload() }
     }
 
+    private func resetZoom(_ chart: [ChartSample]) {
+        guard let first = chart.first?.timestamp, let last = chart.last?.timestamp, last > first else { return }
+        let full = last.timeIntervalSince(first)
+        zoom = ChartZoom(full: full, minimum: min(30 * 60, full), start: first)
+    }
+
     // MARK: - Period selector
 
     private var periodSelector: some View {
@@ -131,6 +139,12 @@ struct MetricDetailView: View {
                         VitalsThresholdEngine.colorToken(forValue: toRaw(value), metric: metric, profile: profile, baseline: baseline).color
                     }
                 )
+                // Chart modifiers reach the inner `Chart` through the environment, so the zoom lives here
+                // and `ZoneLineChart` (shared with the widget extension) stays untouched.
+                .chartZoomable($zoom, start: chart.first?.timestamp ?? Date())
+                .onAppear { resetZoom(chart) }
+                .onChange(of: period) { _, _ in resetZoom(chart) }
+                .onChange(of: chart.count) { _, _ in resetZoom(chart) }
             }
         }
         .padding(.horizontal, 14)
