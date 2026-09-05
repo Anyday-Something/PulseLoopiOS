@@ -35,15 +35,20 @@ private struct ChartZoomModifier: ViewModifier {
             .chartScrollableAxes(.horizontal)
             .chartXVisibleDomain(length: zoom.visible)
             .chartScrollPosition(x: $zoom.scrollTo)
-            .simultaneousGesture(
-                MagnifyGesture()
-                    .onChanged { value in
-                        let next = zoom.gestureBase / max(0.1, value.magnification)
-                        zoom.visible = min(zoom.full, max(zoom.minimum, next))
-                    }
-                    .onEnded { _ in zoom.gestureBase = zoom.visible }
-            )
-            .onTapGesture(count: 2) { withAnimation { zoom.reset(to: start) } }
+            // Gestures go through the chart's own gesture hook so they coexist with its scroll drag; a
+            // gesture attached around the chart steals the drag and scrolling dies.
+            .chartGesture { _ in
+                SimultaneousGesture(
+                    MagnifyGesture()
+                        .onChanged { value in
+                            let next = zoom.gestureBase / max(0.1, value.magnification)
+                            zoom.visible = min(zoom.full, max(zoom.minimum, next))
+                        }
+                        .onEnded { _ in zoom.gestureBase = zoom.visible },
+                    TapGesture(count: 2)
+                        .onEnded { withAnimation { zoom.reset(to: start) } }
+                )
+            }
     }
 }
 
