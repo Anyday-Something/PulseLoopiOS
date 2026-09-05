@@ -349,8 +349,52 @@ struct CompareSourcesView: View {
         } catch {
             self.error = error.localizedDescription
         }
+        #if DEBUG
+        // `-seedDemo` (screenshot / simulator tooling): Health is empty there, so show two synthetic sources.
+        if ProcessInfo.processInfo.arguments.contains("-seedDemo"), heartRate.isEmpty, sleep.isEmpty {
+            heartRate = CompareDemoData.heartRate(day: day)
+            sleep = CompareDemoData.sleep(nightStart: nightStart)
+            spo2 = CompareDemoData.spo2(day: day)
+            error = nil
+        }
+        #endif
     }
 }
+
+#if DEBUG
+/// Two made-up sources for the demo / screenshot run: a Watch and a ring that mostly agree.
+enum CompareDemoData {
+    static func heartRate(day: Date) -> [SourcedHeartRate] {
+        var out: [SourcedHeartRate] = []
+        for minute in stride(from: 0, to: 24 * 60, by: 5) {
+            let t = day.addingTimeInterval(TimeInterval(minute * 60))
+            let base = 62 + 18 * sin(Double(minute) / 180) + (minute > 480 && minute < 520 ? 60 : 0)
+            out.append(SourcedHeartRate(date: t, bpm: base + Double(minute % 7) - 3, source: "Demo Watch"))
+            out.append(SourcedHeartRate(date: t.addingTimeInterval(30), bpm: base + Double(minute % 5) - 2 + (minute > 900 ? 9 : 0), source: "Demo Ring"))
+        }
+        return out
+    }
+
+    static func sleep(nightStart: Date) -> [SourcedSleep] {
+        let bed = nightStart.addingTimeInterval(11 * 3600)   // 23:00
+        func seg(_ from: Double, _ to: Double, _ v: HKCategoryValueSleepAnalysis, _ src: String) -> SourcedSleep {
+            SourcedSleep(start: bed.addingTimeInterval(from * 60), end: bed.addingTimeInterval(to * 60), value: v, source: src)
+        }
+        return [
+            seg(0, 20, .asleepCore, "Demo Watch"), seg(20, 80, .asleepDeep, "Demo Watch"), seg(80, 200, .asleepCore, "Demo Watch"),
+            seg(200, 260, .asleepREM, "Demo Watch"), seg(260, 400, .asleepCore, "Demo Watch"), seg(400, 420, .awake, "Demo Watch"),
+            seg(0, 30, .asleepCore, "Demo Ring"), seg(30, 90, .asleepDeep, "Demo Ring"), seg(90, 210, .asleepCore, "Demo Ring"),
+            seg(210, 250, .asleepREM, "Demo Ring"), seg(250, 420, .asleepCore, "Demo Ring"),
+        ]
+    }
+
+    static func spo2(day: Date) -> [SourcedSpO2] {
+        stride(from: 0, to: 24, by: 2).map { h in
+            SourcedSpO2(date: day.addingTimeInterval(TimeInterval(h * 3600)), percent: 96 + Double(h % 3), source: "Demo Ring")
+        }
+    }
+}
+#endif
 
 // MARK: - Colours
 

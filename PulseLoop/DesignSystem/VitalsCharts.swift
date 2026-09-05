@@ -142,6 +142,7 @@ struct ZoneLineChart: View {
         }
         .vitalsAxes(showAxes: showAxes, range: range)
         .chartOverlay { proxy in
+            // Decorative only: the Canvas must not sit in the way of the chart's own scroll drag.
             GeometryReader { geo in
                 Canvas { context, _ in
                     guard let plotAnchor = proxy.plotFrame else { return }
@@ -152,6 +153,7 @@ struct ZoneLineChart: View {
                     }
                 }
             }
+            .allowsHitTesting(false)
         }
         .frame(height: height)
     }

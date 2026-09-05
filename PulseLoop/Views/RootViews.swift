@@ -137,8 +137,9 @@ struct RootAppView: View {
                 case let .activityDetail(id):
                     ActivityDetailView(sessionId: id)
                 case let .metricDetail(metric):
+                    // No zoom transition here: its interactive-dismiss pan claims horizontal drags, which
+                    // kills the detail chart's scroll (pinch-zoom + drag). A plain push keeps the chart usable.
                     MetricDetailView(metric: metric, path: $path)
-                        .pulseZoomDestination(route, in: zoomNS)
                 case .activityTrends:
                     ActivityTrendsView(path: $path)
                 case .recordSelect:
