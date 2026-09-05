@@ -35,20 +35,31 @@ final class HealthImportService {
 
     var isAvailable: Bool { HKHealthStore.isHealthDataAvailable() }
 
-    private var isRunningUnitTests: Bool { NSClassFromString("XCTestCase") != nil }
+    /// Health must be connected (the share prompt answered) before anything touches `HKSource.default()`:
+    /// a binary without the HealthKit entitlement — the unit-test host, a simulator build — throws an
+    /// ObjC exception from it that Swift cannot catch. Mirrors `HealthSyncService.shouldExport()`.
+    private var canRun: Bool {
+        isAvailable && !isRunningUnitTests && HealthSyncService.shared.authState == .authorized
+    }
+
+    private var isRunningUnitTests: Bool { HealthSyncService.shared.isRunningUnitTests }
 
     // MARK: Entry points
 
     /// Foreground hook: runs when the import is on and the last run is older than the throttle.
     func importIfDue(context: ModelContext) {
-        guard prefs.importFromHealth, isAvailable, !isRunningUnitTests else { return }
+        guard prefs.importFromHealth, canRun else { return }
         if let last = lastRunAt, Date().timeIntervalSince(last) < Self.foregroundThrottle { return }
         Task { await importNow(context: context) }
     }
 
     /// Settings button + foreground hook. Returns after the store is saved.
     func importNow(context: ModelContext) async {
-        guard !isImporting, isAvailable, !isRunningUnitTests else { return }
+        guard !isImporting else { return }
+        guard canRun else {
+            lastResult = "Connect Apple Health first (the toggle above), then import."
+            return
+        }
         isImporting = true
         defer { isImporting = false }
         do {
