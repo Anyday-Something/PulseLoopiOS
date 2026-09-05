@@ -370,7 +370,8 @@ enum CompareDemoData {
             let t = day.addingTimeInterval(TimeInterval(minute * 60))
             let base = 62 + 18 * sin(Double(minute) / 180) + (minute > 480 && minute < 520 ? 60 : 0)
             out.append(SourcedHeartRate(date: t, bpm: base + Double(minute % 7) - 3, source: "Demo Watch"))
-            out.append(SourcedHeartRate(date: t.addingTimeInterval(30), bpm: base + Double(minute % 5) - 2 + (minute > 900 ? 9 : 0), source: "Demo Ring"))
+            let ring = base + Double(minute % 5) - 2 + (minute > 900 ? 9 : 0)
+            out.append(SourcedHeartRate(date: t.addingTimeInterval(30), bpm: ring, source: "Demo Ring"))
         }
         return out
     }
