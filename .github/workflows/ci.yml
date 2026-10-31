@@ -7,9 +7,6 @@ name: CI
 on:
   push:
     branches: [main]
-  pull_request:
-    branches: [main]
-
 # Cancel superseded runs on the same PR/branch to save runner minutes.
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
